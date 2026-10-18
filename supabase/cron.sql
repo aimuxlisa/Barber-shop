@@ -1,6 +1,5 @@
 -- Runs only after pg_cron, pg_net and vault are enabled.
--- The cron secret is the vault secret named cron_secret, not a value in this file.
--- Schedule: every 5 minutes.
+-- The cron secret is the vault secret named cron_secret.
 
 do $$
 declare
@@ -21,7 +20,7 @@ begin
     '*/5 * * * *',
     $job$
     select net.http_post(
-      url := 'https://zbcnrbdaxmszqgfqneyx.supabase.co/functions/v1/notifications',
+      url := 'https://barber-shop-wwwaiwork-7531.vercel.app/internal/notifications',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret' limit 1)

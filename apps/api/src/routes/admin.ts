@@ -1,9 +1,4 @@
-import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
-import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
-import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import multipart from "@fastify/multipart";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
@@ -23,7 +18,23 @@ import { addDays, zonedToUtc } from "../slots.js";
 import { issueBarberLinkCode } from "../telegram-bot.js";
 
 const timeZone = "Asia/Tashkent";
-const uploadDir = resolve(fileURLToPath(new URL("../../../web/public/images/uploads", import.meta.url)));
+const uploadBucket = "uploads";
+
+function uploadUrl(name: string) {
+  return `${process.env.SUPABASE_URL}/storage/v1/object/public/${uploadBucket}/${name}`;
+}
+
+async function putUpload(name: string, contentType: string, data: Buffer) {
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!base || !key) throw new ApiError(503, "STORAGE", "Supabase storage is not configured");
+  const response = await fetch(`${base}/storage/v1/object/${uploadBucket}/${name}`, {
+    method: "POST",
+    headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": contentType, "x-upsert": "true" },
+    body: new Uint8Array(data),
+  });
+  if (!response.ok) throw new ApiError(502, "STORAGE", "The photo was not stored");
+}
 
 const loginBody = z.object({ login: z.string().min(1), password: z.string().min(1) });
 const serviceBody = z.object({
@@ -316,10 +327,9 @@ export const adminRoutes: FastifyPluginAsync<{ prisma: PrismaClient }> = async (
     if (!file) throw new ApiError(400, "VALIDATION", "Choose a photo");
     const ext = file.mimetype === "image/png" ? "png" : file.mimetype === "image/webp" ? "webp" : file.mimetype === "image/jpeg" ? "jpg" : null;
     if (!ext) throw new ApiError(400, "VALIDATION", "Use JPG, PNG, or WebP");
-    await mkdir(uploadDir, { recursive: true });
     const name = `${randomUUID()}.${ext}`;
-    await pipeline(file.file, createWriteStream(join(uploadDir, name)));
-    return reply.code(201).send({ url: `/images/uploads/${name}` });
+    await putUpload(name, file.mimetype, await file.toBuffer());
+    return reply.code(201).send({ url: uploadUrl(name) });
   });
 
   app.post("/api/v1/admin/barbers/:id/portfolio", async (request, reply) => {

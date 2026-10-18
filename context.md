@@ -128,7 +128,9 @@ Prisma 6 лежит в корне: `prisma/schema.prisma`, миграция `pri
 
 Локальный запуск: `POST /internal/notifications` с заголовком `x-cron-secret`. Секрет лежит в `.env` как `CRON_SECRET`.
 
-Edge Function: `supabase/functions/notifications`. Cron `orda-notifications` в Supabase уже стоит на каждые 5 минут и зовёт `https://zbcnrbdaxmszqgfqneyx.supabase.co/functions/v1/notifications`. Секрет крона в vault под именем `cron_secret`. Сама функция ещё не задеплоена: CLI просит `supabase login`. После входа: `supabase functions deploy notifications --project-ref zbcnrbdaxmszqgfqneyx` и секреты функции `CRON_SECRET`, `TELEGRAM_BOT_TOKEN`. Пока деплоя нет, крон получает 404, а рабочий прогон — локальный маршрут API.
+Прод: на проекте `ehqgkmjtlwbpfnsdtytz` установлены `pg_cron`, `pg_net` и `supabase_vault`. Cron-задание `orda-notifications` каждые 5 минут шлёт `net.http_post` в `https://barber-shop-wwwaiwork-7531.vercel.app/internal/notifications` с заголовком `x-cron-secret`. Секрет лежит в vault под именем `cron_secret` и совпадает с `CRON_SECRET` на Vercel. Задание активно и проверено: ответ API `200 {"sent":[],"completed":[]}`.
+
+Edge Function `supabase/functions/notifications` — более не используется в проде. Она есть в проекте, но закрыта JWT (401). `config.toml` и `cron.sql` указывают на проект `ehqgkmjtlwbpfnsdtytz` и на маршрут API.
 
 ## Админка, этап 9
 
@@ -138,7 +140,7 @@ Edge Function: `supabase/functions/notifications`. Cron `orda-notifications` в 
 
 Создание, перенос и отмена визита идут через те же функции, что сайт. Источник ручной записи — `admin`. Отмена из админки не упирается в 30 минут до визита. Статусы: confirmed, completed, cancelled, no_show.
 
-Услуги и барберы: создание, правка, закрытие (`isActive: false`). Фото пишется в `apps/web/public/images/uploads` и отдаётся как `/images/uploads/...`. На кресле — неделя, обед, выходные и портфолио. Часы в базе — UTC TIME, как в сиде. Настройки читаются и пишутся в `settings`, ключи `barber_link:*` на форме скрыты.
+Услуги и барберы: создание, правка, закрытие (`isActive: false`). Фото пишется в Supabase Storage, бакет `uploads`, публичный, и отдаётся как `https://ehqgkmjtlwbpfnsdtytz.supabase.co/storage/v1/object/public/uploads/...`. Загрузка через `SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY`. Локально в `apps/web/public/images/uploads` файлы больше не складываются. На кресле — неделя, обед, выходные и портфолио. Часы в базе — UTC TIME, как в сиде. Настройки читаются и пишутся в `settings`, ключи `barber_link:*` на форме скрыты.
 
 `GET /api/v1/admin/me` без cookie — 401. Проверены вход, список, ручная запись, перенос, отмена, закрытие услуги, загрузка фото, сохранение той же недели и ссылка барбера. Тестовые строки после проверки удалены.
 
