@@ -302,6 +302,7 @@ async function connectTelegram(bot: Bot) {
     if (telegramMode() === "webhook") {
       const webhook = process.env.TELEGRAM_WEBHOOK_URL;
       if (!webhook) return;
+      await bot.init();
       await bot.api.setWebhook(webhook, {
         secret_token: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
         allowed_updates: ["message", "callback_query"],
@@ -331,6 +332,7 @@ export function registerTelegram(app: FastifyInstance, prisma: PrismaClient) {
     if (!webhookAllowed(request.headers["x-telegram-bot-api-secret-token"], secret)) {
       return reply.code(401).send({ code: "TELEGRAM_AUTH", message: "Webhook secret is invalid" });
     }
+    if (!bot.isInited()) await bot.init();
     await bot.handleUpdate(request.body as Parameters<Bot["handleUpdate"]>[0]);
     return reply.send({ ok: true });
   });
